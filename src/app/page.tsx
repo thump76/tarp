@@ -13,13 +13,20 @@ export default async function Home() {
     supabase.from("public_events").select("*").gte("date", todayIso()).order("date"),
     supabase.auth.getUser(),
   ]);
+  const { data: organisers } = await supabase.from("organisers").select("name, slug").order("name");
 
   const nextFor = (id: string) => (events as PublicEvent[] | null)?.find((e) => e.market_id === id);
 
   return (
     <Shell nav={<AuthNav signedIn={!!user} />}>
       <h1 className="text-4xl font-bold">Markets</h1>
-      <p className="mt-2 max-w-prose text-muted">Upcoming dates and pitch availability. Sign in with your email to request a pitch.</p>
+      <p className="mt-2 max-w-prose text-muted">Upcoming dates and pitch availability. New traders apply once to the organiser; approved traders sign in to request dates.</p>
+      {!user && organisers?.map((o) => (
+        <Card key={o.slug} className="mt-6 flex flex-wrap items-center justify-between gap-3">
+          <span>Want to trade with <b className="font-semibold text-ink-strong">{o.name}</b>?</span>
+          <Link href={`/apply/${o.slug}`} className="btn btn-primary">Apply to trade</Link>
+        </Card>
+      ))}
       <div className="mt-8 grid gap-4 sm:grid-cols-2">
         {(markets as Market[] | null)?.map((m) => {
           const n = nextFor(m.id);

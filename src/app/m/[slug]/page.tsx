@@ -3,10 +3,13 @@ import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { Shell, Card, PitchBar, Chip, AuthNav } from "@/components/ui";
 import { fmtDate, fmtMonth, fmtMoney, fmtTime, todayIso } from "@/lib/format";
-import type { Category, Market, PublicEvent, RequestState } from "@/lib/types";
+import type { Market, PublicEvent, RequestState } from "@/lib/types";
 import { RequestButton } from "./request-button";
 
 export const dynamic = "force-dynamic";
+
+/** Where the signed-in visitor stands with this market's organiser. */
+type Standing = "guest" | "none" | "applied" | "rejected" | "approved-other" | "approved";
 
 export default async function MarketPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
@@ -14,21 +17,24 @@ export default async function MarketPage({ params }: { params: Promise<{ slug: s
   const { data: market } = await supabase.from("markets").select("*").eq("slug", slug).maybeSingle<Market>();
   if (!market) notFound();
 
-  const [{ data: events }, { data: { user } }, { data: categories }] = await Promise.all([
+  const [{ data: events }, { data: { user } }, { data: organiser }] = await Promise.all([
     supabase.from("public_events").select("*").eq("market_id", market.id).gte("date", todayIso()).order("date").returns<PublicEvent[]>(),
     supabase.auth.getUser(),
-    supabase.from("categories").select("*").eq("organiser_id", market.organiser_id).order("sort").returns<Category[]>(),
+    supabase.from("organisers").select("name, slug").eq("id", market.organiser_id).single(),
   ]);
+  const applyHref = `/apply/${organiser?.slug}`;
 
-  // the signed-in stallholder's existing requests at this market, so buttons show state
+  let standing: Standing = user ? "none" : "guest";
   let mine: Record<string, RequestState> = {};
-  let hasProfile = false;
   if (user) {
-    const { data: sh } = await supabase.from("stallholders").select("id").eq("organiser_id", market.organiser_id).eq("user_id", user.id).maybeSingle();
-    hasProfile = !!sh;
+    const { data: sh } = await supabase.from("stallholders").select("id, status, stallholder_markets(market_id)")
+      .eq("organiser_id", market.organiser_id).eq("user_id", user.id).maybeSingle();
     if (sh) {
-      const { data: reqs } = await supabase.from("requests").select("event_id, state").eq("stallholder_id", sh.id);
-      mine = Object.fromEntries((reqs ?? []).map((r) => [r.event_id, r.state as RequestState]));
+      const ticked = (sh.stallholder_markets as { market_id: string }[]).some((x) => x.market_id === market.id);
+      standing = sh.status === "applied" ? "applied" : sh.status === "rejected" ? "rejected" : ticked ? "approved" : "approved-other";
+      const { data: reqs } = await supabase.from("requests").select("event_id, state, notified_at").eq("stallholder_id", sh.id);
+      // draft invitations are invisible to the trader until the organiser sends them
+      mine = Object.fromEntries((reqs ?? []).filter((r) => r.state !== "invited" || r.notified_at).map((r) => [r.event_id, r.state as RequestState]));
     }
   }
 
@@ -44,12 +50,7 @@ export default async function MarketPage({ params }: { params: Promise<{ slug: s
       <h1 className="mt-2 text-4xl font-bold">{market.name}</h1>
       <p className="mt-2 text-muted">{market.venue}{market.postcode ? `, ${market.postcode}` : ""}. {market.recurrence_note}.</p>
 
-      {!user && (
-        <Card className="mt-6 flex flex-wrap items-center justify-between gap-3">
-          <span>Want a pitch? Sign in with your email and request a date. The organiser approves and sends the invoice.</span>
-          <Link href={`/login?next=/m/${slug}`} className="btn btn-primary">Sign in to request</Link>
-        </Card>
-      )}
+      <StandingBanner standing={standing} applyHref={applyHref} slug={slug} organiser={organiser?.name ?? "the organiser"} />
 
       <div className="mt-8 flex flex-col gap-10">
         {[...byMonth.entries()].map(([k, list]) => (
@@ -65,22 +66,22 @@ export default async function MarketPage({ params }: { params: Promise<{ slug: s
                       <span className="display text-lg font-semibold">{fmtDate(e.date, { weekday: "long", day: "numeric", month: "long" })}</span>
                       <span className="text-sm text-muted">{fmtTime(e.start_time)} to {fmtTime(e.end_time)}</span>
                     </div>
-                    <PitchBar approved={e.approved} requested={e.requested} max={e.max_pitches} />
+                    <PitchBar approved={e.approved} requested={e.requested + e.invited} max={e.max_pitches} />
                     <div className="flex items-center justify-between text-sm">
                       <span className={`tnum ${e.available <= 3 && !full ? "font-semibold text-red" : "text-muted"}`}>
-                        {full ? "Full, waiting list only" : `${e.available} of ${e.max_pitches} pitches left`}
+                        {full ? "Full" : `${e.available} of ${e.max_pitches} pitches left`}
                       </span>
                       <span className="text-muted">{fmtMoney(e.fee_pence)} a pitch</span>
                     </div>
                     {e.note && <div className="text-sm text-muted">{e.note}</div>}
                     <div className="mt-1 flex items-center justify-between">
-                      {state === "approved" && <Chip kind="appr">Approved</Chip>}
+                      {state === "approved" && <Chip kind="appr">You are attending</Chip>}
+                      {state === "invited" && <Link href="/me" className="chip chip-req">Invited, reply in My requests</Link>}
                       {state === "requested" && <Chip kind="req">Requested</Chip>}
-                      {state === "declined" && <Chip kind="avail">Not this time</Chip>}
-                      {state === "released" && <Chip kind="avail">Released</Chip>}
+                      {(state === "declined" || state === "withdrawn" || state === "released") && <Chip kind="avail">Not attending</Chip>}
                       {!state && <span />}
-                      {user && !state && (
-                        <RequestButton eventId={e.id} slug={slug} full={full} hasProfile={hasProfile} categories={categories ?? []} label={fmtDate(e.date)} />
+                      {standing === "approved" && !state && (
+                        <RequestButton eventId={e.id} slug={slug} full={full} label={fmtDate(e.date)} />
                       )}
                     </div>
                   </Card>
@@ -93,4 +94,31 @@ export default async function MarketPage({ params }: { params: Promise<{ slug: s
       </div>
     </Shell>
   );
+}
+
+function StandingBanner({ standing, applyHref, slug, organiser }: { standing: Standing; applyHref: string; slug: string; organiser: string }) {
+  if (standing === "approved") return null;
+  const box = "mt-6 flex flex-wrap items-center justify-between gap-3";
+  if (standing === "guest") {
+    return (
+      <Card className={box}>
+        <span>Want a pitch? New traders apply once to {organiser}. Approved traders sign in to request dates.</span>
+        <span className="flex gap-2">
+          <Link href={applyHref} className="btn btn-primary">Apply to trade</Link>
+          <Link href={`/login?next=/m/${slug}`} className="btn btn-ghost">Sign in</Link>
+        </span>
+      </Card>
+    );
+  }
+  if (standing === "none") {
+    return (
+      <Card className={box}>
+        <span>You have not applied to trade with {organiser} yet.</span>
+        <Link href={applyHref} className="btn btn-primary">Apply to trade</Link>
+      </Card>
+    );
+  }
+  if (standing === "applied") return <Card className="mt-6">Your application is with {organiser}. You will get an email when it has been reviewed.</Card>;
+  if (standing === "rejected") return <Card className="mt-6">{organiser} is not able to offer you a place at the moment.</Card>;
+  return <Card className="mt-6">You are approved with {organiser}, but not for this market. Ask the organiser if you would like to trade here too.</Card>;
 }

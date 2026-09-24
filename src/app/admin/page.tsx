@@ -42,7 +42,7 @@ export default async function AdminCalendar({ searchParams }: { searchParams: Pr
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 className="text-4xl font-bold">Next three months</h1>
-          <p className="mt-1 text-muted">{list.length} market days</p>
+          <p className="mt-1 text-muted">{list.length} market days. Tap a date to build its line-up.</p>
         </div>
       </div>
 
@@ -63,7 +63,7 @@ export default async function AdminCalendar({ searchParams }: { searchParams: Pr
                 const unpaidN = unpaidByEvent.get(ev.id) ?? 0;
                 const sel = ev.id === selected?.id;
                 return (
-                  <Link key={ev.id} href={`/admin?e=${ev.id}`} scroll={false}
+                  <Link key={ev.id} href={`/admin/event/${ev.id}`}
                     className={`block rounded-2xl bg-card p-3.5 transition hover:shadow-sm ${sel ? "outline-2 outline-ink-strong" : ""}`}>
                     <div className="flex items-baseline justify-between gap-2">
                       <span className="display text-lg font-semibold">{fmtDate(ev.date)}</span>

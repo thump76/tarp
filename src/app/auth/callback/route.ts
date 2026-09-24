@@ -8,7 +8,11 @@ export async function GET(request: Request) {
   if (code) {
     const supabase = await createClient();
     const { error } = await supabase.auth.exchangeCodeForSession(code);
-    if (!error) return NextResponse.redirect(`${origin}${next.startsWith("/") ? next : "/"}`);
+    if (!error) {
+      // attach this sign-in to any trader profile created by an application or an import
+      await supabase.rpc("claim_my_profiles");
+      return NextResponse.redirect(`${origin}${next.startsWith("/") ? next : "/"}`);
+    }
   }
   return NextResponse.redirect(`${origin}/login?error=1`);
 }

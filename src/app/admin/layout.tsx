@@ -23,9 +23,12 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   }
 
   const orgName = (membership as unknown as { organisers: { name: string } }).organisers?.name;
+  const { count: applications } = await supabase.from("stallholders").select("id", { count: "exact", head: true })
+    .eq("organiser_id", membership.organiser_id).eq("status", "applied");
   const nav = (
     <nav className="flex flex-wrap gap-2 text-sm">
       <Link href="/admin" className="btn btn-ghost">Calendar</Link>
+      <Link href="/admin/traders" className="btn btn-ghost">Traders{applications ? <span className="chip chip-req ml-2 !py-0">{applications}</span> : null}</Link>
       <Link href="/admin/requests" className="btn btn-ghost">Requests</Link>
       <Link href="/admin/money" className="btn btn-ghost">Money</Link>
       <Link href="/" className="btn btn-ghost">Public site</Link>

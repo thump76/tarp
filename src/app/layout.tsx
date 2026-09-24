@@ -11,7 +11,7 @@ export const metadata: Metadata = {
  * When the Recoleta licence is in hand, drop the woff2 files in src/fonts, replace the link
  * below with next/font/local, and point --font-fraunces in globals.css at it.
  */
-export default function RootLayout({ children }: LayoutProps<"/">) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en-GB" className="h-full">
       <head>

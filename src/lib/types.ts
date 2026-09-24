@@ -15,6 +15,7 @@ export type PublicEvent = {
   note: string | null;
   approved: number;
   requested: number;
+  invited: number;
   available: number;
 };
 
@@ -41,9 +42,16 @@ export type Stallholder = {
   email: string;
   category_id: string | null;
   notes: string | null;
+  status: "applied" | "approved" | "rejected";
+  description: string | null;
+  website: string | null;
+  instagram: string | null;
+  phone: string | null;
+  requested_market_ids: string[];
+  applied_at: string | null;
 };
 
-export type RequestState = "requested" | "approved" | "declined" | "released";
+export type RequestState = "requested" | "invited" | "approved" | "declined" | "withdrawn" | "released";
 
 export type EventMix = {
   event_id: string;
@@ -54,4 +62,5 @@ export type EventMix = {
   sort: number | null;
   approved: number;
   requested: number;
+  invited: number;
 };
