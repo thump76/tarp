@@ -1,4 +1,4 @@
--- Marketday schema v1
+-- Tarp schema v1
 -- Core loop: an event has N pitches. A request is Requested, Approved, Declined or Released.
 -- Paid is a property of the approved request's invoice, not a state of its own.
 

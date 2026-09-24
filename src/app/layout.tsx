@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Marketday",
+  title: "Tarp",
   description: "Booking, invoicing and calendar for market organisers.",
 };
 

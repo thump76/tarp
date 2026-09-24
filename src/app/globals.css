@@ -1,6 +1,6 @@
 @import "tailwindcss";
 
-/* Marketday brand tokens. Light only, on purpose: the cream-and-navy identity is the product. */
+/* Tarp brand tokens. Light only, on purpose: the cream-and-navy identity is the product. */
 :root {
   color-scheme: light;
   --cream: #f6f1dc;

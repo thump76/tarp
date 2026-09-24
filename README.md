@@ -1,4 +1,4 @@
-# Marketday
+# Tarp
 
 Booking, invoicing and calendar for market organisers. First customer: The Producers Markets (CC Events UK).
 

@@ -5,11 +5,11 @@ export function Shell({ children, nav }: { children: ReactNode; nav?: ReactNode 
   return (
     <div className="mx-auto w-full max-w-5xl px-4 py-6 sm:px-6">
       <header className="mb-8 flex flex-wrap items-baseline justify-between gap-4">
-        <Link href="/" className="display text-2xl font-bold">Marketday</Link>
+        <Link href="/" className="display text-2xl font-bold">Tarp</Link>
         {nav}
       </header>
       <main>{children}</main>
-      <footer className="mt-16 text-xs text-muted">Marketday, early access. Questions to philipbrumpton@gmail.com</footer>
+      <footer className="mt-16 text-xs text-muted">Tarp, early access. Questions to philipbrumpton@gmail.com</footer>
     </div>
   );
 }
