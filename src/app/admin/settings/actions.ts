@@ -61,3 +61,37 @@ export async function savePayments(formData: FormData) {
   if (error) throw new Error(error.message);
   refresh();
 }
+
+// ---------- categories ----------
+function readCategory(formData: FormData) {
+  const get = (k: string) => String(formData.get(k) ?? "").trim();
+  const name = get("name");
+  if (!name) throw new Error("Give the category a name.");
+  const capRaw = get("cap");
+  const cap = capRaw === "" ? null : Math.max(0, Math.floor(Number(capRaw)));
+  const colour = /^#[0-9a-fA-F]{6}$/.test(get("colour")) ? get("colour").toLowerCase() : null;
+  return { name, cap: cap === null || Number.isNaN(cap) ? null : cap, colour };
+}
+
+export async function addCategory(formData: FormData) {
+  const { supabase, org } = await currentOrganiser();
+  const { data: last } = await supabase.from("categories").select("sort").eq("organiser_id", org.id).order("sort", { ascending: false }).limit(1).maybeSingle();
+  const { error } = await supabase.from("categories").insert({ ...readCategory(formData), organiser_id: org.id, sort: (last?.sort ?? 0) + 10 });
+  if (error) throw new Error(error.code === "23505" ? "There is already a category with that name." : error.message);
+  revalidatePath("/admin", "layout");
+}
+
+export async function updateCategory(formData: FormData) {
+  const { supabase, org } = await currentOrganiser();
+  const { error } = await supabase.from("categories").update(readCategory(formData)).eq("id", String(formData.get("id"))).eq("organiser_id", org.id);
+  if (error) throw new Error(error.code === "23505" ? "There is already a category with that name." : error.message);
+  revalidatePath("/admin", "layout");
+}
+
+/** Traders in the category keep their row; their category becomes "No category". */
+export async function deleteCategory(formData: FormData) {
+  const { supabase, org } = await currentOrganiser();
+  const { error } = await supabase.from("categories").delete().eq("id", String(formData.get("id"))).eq("organiser_id", org.id);
+  if (error) throw new Error(error.message);
+  revalidatePath("/admin", "layout");
+}

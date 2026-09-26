@@ -5,7 +5,7 @@ export const field = "w-full rounded-xl border border-line bg-white/60 px-3 py-2
 
 export function Field({ label, hint, children }: { label: string; hint?: string; children: ReactNode }) {
   return (
-    <label className="grid gap-1 text-sm">
+    <label className="grid content-start gap-1 text-sm">
       <span className="font-semibold">{label}</span>
       {children}
       {hint && <span className="text-xs text-muted">{hint}</span>}

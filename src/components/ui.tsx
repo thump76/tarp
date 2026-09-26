@@ -1,15 +1,17 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { currentMembership } from "@/lib/admin";
-import { AdminToggle, NavLink } from "./nav-link";
+import { AdminToggle, NavLink, SignOut } from "./nav-link";
 
 export function Shell({ children, nav }: { children: ReactNode; nav?: ReactNode }) {
   return (
     <div className="mx-auto w-full max-w-5xl px-4 py-6 sm:px-6">
-      <header className="mb-8 flex flex-wrap items-center justify-between gap-x-6 gap-y-3">
-        <Link href="/" className="display text-2xl font-bold">Tarp</Link>
+      <header className="mb-8">
+        <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3">
+          <Link href="/" className="display text-2xl font-bold">Tarp</Link>
+          {nav}
+        </div>
         <AdminBar />
-        {nav}
       </header>
       <main>{children}</main>
       <footer className="mt-16 text-xs text-muted">Tarp, early access. Questions to philipbrumpton@gmail.com</footer>
@@ -21,7 +23,7 @@ export function Shell({ children, nav }: { children: ReactNode; nav?: ReactNode 
 async function AdminBar() {
   const { member } = await currentMembership();
   if (!member) return null;
-  return <AdminToggle />;
+  return <div className="mt-4 flex justify-end"><AdminToggle /></div>;
 }
 
 export function PitchBar({ approved, requested, max }: { approved: number; requested: number; max: number }) {
@@ -55,11 +57,12 @@ export function Stat({ label, value, sub }: { label: string; value: ReactNode; s
 
 export function AuthNav({ signedIn }: { signedIn: boolean }) {
   return (
-    <nav className="flex gap-2 text-sm">
+    <nav className="flex items-center gap-1 text-sm">
       {signedIn ? (
         <>
           <NavLink href="/" exact>Markets</NavLink>
           <NavLink href="/me">My markets</NavLink>
+          <SignOut />
         </>
       ) : (
         <Link href="/login" className="btn btn-primary">Sign in</Link>
