@@ -73,11 +73,9 @@ export default async function AdminCalendar({ searchParams }: { searchParams: Pr
                 return (
                   <Link key={ev.id} href={`/admin/event/${ev.id}`}
                     className={`block rounded-2xl bg-card p-3.5 transition hover:shadow-sm ${sel ? "outline-2 outline-ink-strong" : ""} ${past ? "is-past" : ""}`}>
-                    <div className="flex items-baseline justify-between gap-2">
-                      <span className="display text-lg font-semibold">{fmtDate(ev.date)}</span>
-                      <span className="text-xs text-muted">{ev.market_name}</span>
-                    </div>
-                    {ev.theme && <div className="mt-0.5 text-sm text-muted">{ev.theme}</div>}
+                    <div className="display text-lg font-semibold">{fmtDate(ev.date)}</div>
+                    <div className="mt-0.5 text-sm font-semibold text-ink-strong">{ev.market_name}</div>
+                    {ev.theme && <div className="text-sm text-muted">{ev.theme}</div>}
                     <div className="mt-2"><PitchBar approved={ev.approved} requested={ev.requested + ev.invited} max={ev.max_pitches} /></div>
                     <div className="mt-2 flex justify-between text-xs text-muted tnum">
                       <span><b className="font-semibold text-ink">{ev.approved}</b> of {ev.max_pitches} attending{ev.requested ? <>, <b className="font-semibold text-ink">{ev.requested}</b> requested</> : null}</span>

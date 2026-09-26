@@ -69,8 +69,12 @@ h1, h2, h3, .display {
 .btn-danger { border: 1px solid var(--red); color: var(--red); background: transparent; }
 .btn-danger:hover { background: var(--red-bg); }
 
-/* current page in the nav: a bold border, same size as its neighbours */
-.btn-ghost.nav-active { border-color: var(--ink-strong); box-shadow: inset 0 0 0 1px var(--ink-strong); color: var(--ink-strong); }
+/* main nav: quiet text pills, the current page gets a bold border */
+.nav-item { @apply inline-flex items-center justify-center gap-1.5 rounded-full px-3.5 py-2 text-sm font-semibold transition; color: var(--ink); border: 1px solid transparent; }
+.nav-item:hover { background: var(--card); }
+.nav-item.nav-active { border-color: var(--ink-strong); box-shadow: inset 0 0 0 1px var(--ink-strong); color: var(--ink-strong); }
+.nav-icon { @apply px-2.5; }
+.nav-icon svg { width: 18px; height: 18px; }
 
 /* secondary link, for archive and deleted lists */
 .link-secondary { @apply text-sm underline underline-offset-2 text-muted hover:text-ink; }

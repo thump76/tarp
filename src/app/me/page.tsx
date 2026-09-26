@@ -46,7 +46,7 @@ export default async function Me() {
     <Shell nav={<AuthNav signedIn={!!user} />}>
       <div className="flex flex-wrap items-baseline justify-between gap-3">
         <h1 className="text-3xl font-bold">My markets</h1>
-        <form action="/logout" method="post"><button className="text-sm text-muted hover:underline">Sign out ({user?.email})</button></form>
+        <span className="text-sm text-muted">{user?.email}</span>
       </div>
 
       {!me.length && (

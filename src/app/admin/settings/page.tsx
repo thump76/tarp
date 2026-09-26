@@ -2,17 +2,22 @@ import { currentOrganiser } from "@/lib/admin";
 import { Card, Chip } from "@/components/ui";
 import { Field, field } from "@/components/form";
 import { fmtDate } from "@/lib/format";
-import type { Member, OrganiserSettings } from "@/lib/types";
+import type { Category, Member, OrganiserSettings } from "@/lib/types";
 import { inviteAdmin, removeAdmin, savePayments } from "./actions";
+import { Categories } from "./categories";
 
 export const dynamic = "force-dynamic";
 
 export default async function Settings() {
   const { supabase, org, member } = await currentOrganiser();
-  const [{ data: team }, { data: settings }] = await Promise.all([
+  const [{ data: team }, { data: settings }, { data: categories }, { data: traderCats }] = await Promise.all([
     supabase.from("organiser_members").select("*").eq("organiser_id", org.id).is("removed_at", null).order("invited_at").returns<Member[]>(),
     supabase.from("organiser_settings").select("*").eq("organiser_id", org.id).maybeSingle<OrganiserSettings>(),
+    supabase.from("categories").select("*").eq("organiser_id", org.id).order("sort").returns<Category[]>(),
+    supabase.from("stallholders").select("category_id").eq("organiser_id", org.id).is("deleted_at", null).not("category_id", "is", null),
   ]);
+  const counts: Record<string, number> = {};
+  for (const t of traderCats ?? []) if (t.category_id) counts[t.category_id] = (counts[t.category_id] ?? 0) + 1;
   const owners = (team ?? []).filter((m) => m.role === "owner").length;
 
   return (
@@ -50,6 +55,13 @@ export default async function Settings() {
             <button className="btn btn-primary">Add and email</button>
           </form>
         </Card>
+      </section>
+
+      {/* ---------- categories ---------- */}
+      <section className="mt-12">
+        <h2 className="text-2xl font-semibold">Categories</h2>
+        <p className="mt-1 max-w-prose text-sm text-muted">What traders sell. The optional max per date is a soft limit: the board turns amber when a category is full, and you can still go over.</p>
+        <div className="mt-4 max-w-3xl"><Categories categories={categories ?? []} counts={counts} /></div>
       </section>
 
       {/* ---------- payments ---------- */}
