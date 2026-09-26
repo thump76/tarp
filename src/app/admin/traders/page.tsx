@@ -14,8 +14,8 @@ export default async function Traders({ searchParams }: { searchParams: Promise<
   const { q } = await searchParams;
   const { supabase, org } = await currentOrganiser();
   const [{ data: traders }, { data: markets }, { data: categories }] = await Promise.all([
-    supabase.from("stallholders").select("*, stallholder_markets(market_id)").eq("organiser_id", org.id).order("business_name").returns<Row[]>(),
-    supabase.from("markets").select("*").eq("organiser_id", org.id).order("name").returns<Market[]>(),
+    supabase.from("stallholders").select("*, stallholder_markets(market_id)").eq("organiser_id", org.id).is("deleted_at", null).order("business_name").returns<Row[]>(),
+    supabase.from("markets").select("*").eq("organiser_id", org.id).is("deleted_at", null).order("name").returns<Market[]>(),
     supabase.from("categories").select("*").eq("organiser_id", org.id).order("sort").returns<Category[]>(),
   ]);
   const all = traders ?? [];
@@ -95,19 +95,23 @@ export default async function Traders({ searchParams }: { searchParams: Promise<
                 <th className="px-4 py-3 font-semibold">Trader</th>
                 <th className="px-4 py-3 font-semibold">Category</th>
                 {markets?.map((m) => <th key={m.id} className="px-2 py-3 text-center font-semibold">{m.name}</th>)}
+                <th className="px-2 py-3"><span className="sr-only">Edit</span></th>
               </tr>
             </thead>
             <tbody>
               {approved.map((t) => (
                 <TraderRow key={t.id} trader={t} markets={markets ?? []} categories={categories ?? []} ticked={t.stallholder_markets.map((x) => x.market_id)} />
               ))}
-              {!approved.length && <tr><td colSpan={2 + (markets?.length ?? 0)} className="px-4 py-6 text-muted">{needle ? "No traders match that search." : "No approved traders yet. Import your spreadsheet or approve an application."}</td></tr>}
+              {!approved.length && <tr><td colSpan={3 + (markets?.length ?? 0)} className="px-4 py-6 text-muted">{needle ? "No traders match that search." : "No approved traders yet. Import your spreadsheet or approve an application."}</td></tr>}
             </tbody>
           </table>
         </div>
         {all.some((t) => t.status === "rejected") && (
           <p className="mt-3 text-sm text-muted">Not accepted: {all.filter((t) => t.status === "rejected").map((t) => t.business_name).join(", ")}</p>
         )}
+        <div className="mt-6">
+          <Link href="/admin/traders/deleted" className="link-secondary">Deleted traders</Link>
+        </div>
       </section>
     </>
   );

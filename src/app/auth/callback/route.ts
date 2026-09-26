@@ -11,6 +11,8 @@ export async function GET(request: Request) {
     if (!error) {
       // attach this sign-in to any trader profile created by an application or an import
       await supabase.rpc("claim_my_profiles");
+      // and to any admin invite sent to this email
+      await supabase.rpc("claim_my_memberships");
       return NextResponse.redirect(`${origin}${next.startsWith("/") ? next : "/"}`);
     }
   }

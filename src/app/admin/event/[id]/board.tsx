@@ -8,6 +8,7 @@ import {
 import type { Category, RequestState } from "@/lib/types";
 import { fmtDate } from "@/lib/format";
 import { placeTrader, copyLineup, sendInvitations, type Column } from "./actions";
+import type { PreviousDate } from "../event-form";
 
 export type BoardTrader = {
   id: string;
@@ -51,12 +52,16 @@ const COLS: { id: Col; title: string; hint: string }[] = [
   { id: "attending", title: "Attending", hint: "Confirmed and invoiced." },
 ];
 
-export function Board({ eventId, maxPitches, categories, initial, prevLabel }: {
-  eventId: string; maxPitches: number; categories: Category[]; initial: BoardTrader[]; prevLabel: string | null;
+export function Board({ eventId, maxPitches, categories, initial, previous, copiedOnCreate = 0 }: {
+  eventId: string; maxPitches: number; categories: Category[]; initial: BoardTrader[]; previous: PreviousDate[]; copiedOnCreate?: number;
 }) {
   const [traders, setTraders] = useState(initial);
+  const [copyFrom, setCopyFrom] = useState("");
   const [dragging, setDragging] = useState<string | null>(null);
-  const [toast, setToast] = useState<{ text: string; undo?: () => void } | null>(null);
+  // arriving from Create event date with traders copied over shows a toast straight away
+  const [toast, setToast] = useState<{ text: string; undo?: () => void } | null>(
+    copiedOnCreate > 0 ? { text: `${copiedOnCreate} trader${copiedOnCreate === 1 ? "" : "s"} copied over as drafts. Send the invitations when you are ready.` } : null,
+  );
   const [q, setQ] = useState("");
   const [cat, setCat] = useState("");
   const [pending, start] = useTransition();
@@ -172,11 +177,23 @@ export function Board({ eventId, maxPitches, categories, initial, prevLabel }: {
                         className="w-full rounded-lg border border-line bg-white/60 px-2 py-1 text-sm" />
                     ) : c.id === "invited" ? (
                       <div className="flex flex-col gap-1.5">
-                        {prevLabel && (
-                          <button className="btn btn-ghost !py-1 text-xs" disabled={pending}
-                            onClick={() => start(async () => { const n = await copyLineup(eventId); flash(n ? `${n} regulars from ${prevLabel} added as drafts` : `Everyone from ${prevLabel} is already on this date`); })}>
-                            Copy line-up from {prevLabel}
-                          </button>
+                        {previous.length > 0 && (
+                          <div className="flex gap-1.5">
+                            <select value={copyFrom} onChange={(e) => setCopyFrom(e.target.value)} aria-label="Copy traders from"
+                              className="min-w-0 flex-1 rounded-lg border border-line bg-white/60 px-2 py-1 text-xs">
+                              <option value="">Copy traders from…</option>
+                              {previous.map((p) => <option key={p.id} value={p.id}>{p.label}</option>)}
+                            </select>
+                            <button className="btn btn-ghost !px-2.5 !py-1 text-xs" disabled={pending || !copyFrom}
+                              onClick={() => start(async () => {
+                                const label = previous.find((p) => p.id === copyFrom)?.label ?? "that date";
+                                const n = await copyLineup(eventId, copyFrom);
+                                flash(n ? `${n} trader${n === 1 ? "" : "s"} from ${label} added as drafts` : `Everyone from ${label} is already on this date`);
+                                setCopyFrom("");
+                              })}>
+                              Copy
+                            </button>
+                          </div>
                         )}
                         {drafts > 0 && (
                           <button className="btn btn-primary !py-1 text-xs" disabled={pending}

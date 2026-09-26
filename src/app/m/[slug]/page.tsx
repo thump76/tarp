@@ -14,7 +14,7 @@ type Standing = "guest" | "none" | "applied" | "rejected" | "approved-other" | "
 export default async function MarketPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
   const supabase = await createClient();
-  const { data: market } = await supabase.from("markets").select("*").eq("slug", slug).maybeSingle<Market>();
+  const { data: market } = await supabase.from("markets").select("*").eq("slug", slug).is("deleted_at", null).maybeSingle<Market>();
   if (!market) notFound();
 
   const [{ data: events }, { data: { user } }, { data: organiser }] = await Promise.all([
@@ -63,7 +63,7 @@ export default async function MarketPage({ params }: { params: Promise<{ slug: s
                 return (
                   <Card key={e.id} className="flex flex-col gap-3">
                     <div className="flex items-baseline justify-between gap-3">
-                      <span className="display text-lg font-semibold">{fmtDate(e.date, { weekday: "long", day: "numeric", month: "long" })}</span>
+                      <span className="display text-lg font-semibold">{fmtDate(e.date, { weekday: "long", day: "numeric", month: "long" })}{e.theme ? <span className="font-sans text-sm font-medium text-muted">, {e.theme}</span> : null}</span>
                       <span className="text-sm text-muted">{fmtTime(e.start_time)} to {fmtTime(e.end_time)}</span>
                     </div>
                     <PitchBar approved={e.approved} requested={e.requested + e.invited} max={e.max_pitches} />
@@ -73,7 +73,6 @@ export default async function MarketPage({ params }: { params: Promise<{ slug: s
                       </span>
                       <span className="text-muted">{fmtMoney(e.fee_pence)} a pitch</span>
                     </div>
-                    {e.note && <div className="text-sm text-muted">{e.note}</div>}
                     <div className="mt-1 flex items-center justify-between">
                       {state === "approved" && <Chip kind="appr">You are attending</Chip>}
                       {state === "invited" && <Link href="/me" className="chip chip-req">Invited, reply in My requests</Link>}

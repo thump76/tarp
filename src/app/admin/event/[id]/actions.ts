@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { currentOrganiser } from "@/lib/admin";
-import { sendEmail, siteUrl } from "@/lib/email";
+import { paymentBlock, sendEmail, siteUrl } from "@/lib/email";
 import { fmtDate, fmtMoney } from "@/lib/format";
 
 export type Column = "pool" | "invited" | "approved";
@@ -34,9 +34,12 @@ export async function placeTrader(eventId: string, stallholderId: string, to: Co
   if (sh && ev) {
     const when = `${fmtDate(ev.date, { weekday: "long", day: "numeric", month: "long" })} at ${ev.market_name}`;
     if (result === "approved" && before?.state === "requested") {
-      const { data: inv } = await supabase.from("invoices").select("amount_pence, due_date").eq("request_id", before.id).single();
+      const [{ data: inv }, { data: bank }] = await Promise.all([
+        supabase.from("invoices").select("reference, amount_pence, due_date").eq("request_id", before.id).single(),
+        supabase.from("organiser_settings").select("bank_account_name, bank_sort_code, bank_account_number, payment_note").eq("organiser_id", org.id).maybeSingle(),
+      ]);
       await sendEmail({ to: sh.email, subject: `Confirmed: ${when}`,
-        text: `${sh.business_name} is confirmed for ${when}.\n\n${inv ? `Pitch fee ${fmtMoney(inv.amount_pence)}, due by ${fmtDate(inv.due_date, { day: "numeric", month: "long" })}.\n\n` : ""}See your bookings: ${siteUrl("/me")}\n\n${org.name}` });
+        text: `${sh.business_name} is confirmed for ${when}.\n\n${inv ? `Pitch fee ${fmtMoney(inv.amount_pence)}, due by ${fmtDate(inv.due_date, { day: "numeric", month: "long" })}.\n\n${paymentBlock(bank, inv.reference)}\n\n` : ""}See your bookings: ${siteUrl("/me")}\n\n${org.name}` });
     } else if (result === "declined") {
       await sendEmail({ to: sh.email, subject: `Your request for ${when}`,
         text: `Thank you for asking. We are not able to offer ${sh.business_name} a pitch on ${when}, usually because the market is full or we already have similar stalls that day. Do request another date.\n\n${siteUrl("/me")}\n\n${org.name}` });
@@ -49,10 +52,10 @@ export async function placeTrader(eventId: string, stallholderId: string, to: Co
   return result as string;
 }
 
-/** Invite everyone who attended the previous date at this market. Creates drafts. */
-export async function copyLineup(eventId: string): Promise<number> {
+/** Invite everyone who attended another date at this location. Creates drafts. */
+export async function copyLineup(eventId: string, fromEventId: string): Promise<number> {
   const { supabase } = await currentOrganiser();
-  const { data, error } = await supabase.rpc("copy_lineup", { ev: eventId });
+  const { data, error } = await supabase.rpc("copy_lineup", { ev: eventId, from_ev: fromEventId });
   if (error) throw new Error(error.message);
   refresh(eventId);
   return data as number;

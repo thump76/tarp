@@ -1,19 +1,21 @@
 import { fmtDate } from "@/lib/format";
-import type { EventMix, PublicEvent } from "@/lib/types";
+import type { EventMix } from "@/lib/types";
 
 type Cat = { id: string; name: string; cap: number | null; colour: string | null; sort: number };
+type Ev = { date: string; market_name: string; theme?: string | null; approved: number; requested: number; invited: number; max_pitches: number };
 
 /** Category mix for one event: a stacked bar and a count per category, with "full" when a soft cap is reached. */
-export function MixPanel({ event, mix, categories }: { event: PublicEvent; mix: EventMix[]; categories: Cat[] }) {
+export function MixPanel({ event, mix, categories }: { event: Ev; mix: EventMix[]; categories: Cat[] }) {
   const byCat = new Map(mix.map((m) => [m.category_id ?? "none", m]));
   const rows = categories.map((c) => ({ ...c, approved: byCat.get(c.id)?.approved ?? 0, requested: byCat.get(c.id)?.requested ?? 0, invited: byCat.get(c.id)?.invited ?? 0 }));
   const uncategorised = byCat.get("none")?.approved ?? 0;
+  const available = event.max_pitches - event.approved - event.requested - event.invited;
 
   return (
     <div className="mt-6 rounded-2xl bg-card p-4">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <b className="display text-lg font-semibold">Mix for {fmtDate(event.date)}, {event.market_name}</b>
-        <span className="text-xs text-muted">{event.approved} approved of {event.max_pitches}. Mix for the next market.</span>
+        <b className="display text-lg font-semibold">Mix for {fmtDate(event.date)}, {event.market_name}{event.theme ? `, ${event.theme}` : ""}</b>
+        <span className="text-xs text-muted">{event.approved} attending of {event.max_pitches}.</span>
       </div>
       <div className="mt-3 flex h-3.5 gap-0.5 overflow-hidden rounded-full" aria-hidden="true">
         {rows.filter((r) => r.approved > 0).map((r) => (
@@ -34,7 +36,7 @@ export function MixPanel({ event, mix, categories }: { event: PublicEvent; mix: 
           );
         })}
         {uncategorised > 0 && <span className="inline-flex items-center gap-1.5"><i className="inline-block h-2.5 w-2.5 rounded-sm bg-line" />Uncategorised <b className="font-semibold">{uncategorised}</b></span>}
-        <span className="inline-flex items-center gap-1.5"><i className="inline-block h-2.5 w-2.5 rounded-sm border border-line bg-cream-deep" />Available <b className="font-semibold">{event.available}</b></span>
+        <span className="inline-flex items-center gap-1.5"><i className="inline-block h-2.5 w-2.5 rounded-sm border border-line bg-cream-deep" />Available <b className="font-semibold">{Math.max(0, available)}</b></span>
       </div>
     </div>
   );

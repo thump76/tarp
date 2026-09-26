@@ -64,7 +64,7 @@ export async function importTraders(rows: NewTrader[], notify: boolean): Promise
   const { supabase, org } = await currentOrganiser();
   const [{ data: cats }, { data: mkts }, { data: existing }] = await Promise.all([
     supabase.from("categories").select("id, name").eq("organiser_id", org.id),
-    supabase.from("markets").select("id, name, slug").eq("organiser_id", org.id),
+    supabase.from("markets").select("id, name, slug").eq("organiser_id", org.id).is("deleted_at", null),
     supabase.from("stallholders").select("email").eq("organiser_id", org.id),
   ]);
   const norm = (s: string) => s.trim().toLowerCase();
@@ -110,4 +110,58 @@ export async function addTrader(formData: FormData) {
   }], formData.get("notify") === "on");
   if (!res.added) throw new Error(res.skipped[0] ?? "Could not add that trader.");
   redirect("/admin/traders");
+}
+
+/** Edit an approved trader's details. Email changes are allowed; the trader signs in with the new one. */
+export async function updateTrader(formData: FormData) {
+  const get = (k: string) => String(formData.get(k) ?? "").trim();
+  const { supabase, org } = await currentOrganiser();
+  const id = get("id");
+  const email = get("email").toLowerCase();
+  if (!get("business_name") || !email.includes("@")) throw new Error("Business name and a valid email are required.");
+  const { error } = await supabase.from("stallholders").update({
+    business_name: get("business_name"), contact_name: get("contact_name") || null, email,
+    phone: get("phone") || null, category_id: get("category_id") || null,
+    description: get("description") || null, website: get("website") || null,
+    instagram: get("instagram").replace(/^@/, "") || null, notes: get("notes") || null,
+  }).eq("id", id).eq("organiser_id", org.id);
+  if (error) throw new Error(error.code === "23505" ? "Another trader already uses that email." : error.message);
+  const ticked = new Set(formData.getAll("markets").map(String));
+  const { data: cur } = await supabase.from("stallholder_markets").select("market_id").eq("stallholder_id", id);
+  const have = new Set((cur ?? []).map((c) => c.market_id));
+  const add = [...ticked].filter((m) => !have.has(m)).map((m) => ({ stallholder_id: id, market_id: m }));
+  const drop = [...have].filter((m) => !ticked.has(m));
+  if (add.length) await supabase.from("stallholder_markets").insert(add);
+  if (drop.length) await supabase.from("stallholder_markets").delete().eq("stallholder_id", id).in("market_id", drop);
+  refresh();
+  redirect("/admin/traders");
+}
+
+/**
+ * Soft delete: the trader leaves every pool and list and cannot request dates, but their history
+ * (past attendance, invoices) is kept. Confirmed pitches on upcoming dates are released and their
+ * unpaid invoices voided. Restorable from Deleted traders.
+ */
+export async function deleteTrader(formData: FormData) {
+  const { supabase, org } = await currentOrganiser();
+  const id = String(formData.get("id"));
+  const today = new Date().toISOString().slice(0, 10);
+  const { data: live } = await supabase.from("requests").select("event_id, events!inner(date)")
+    .eq("stallholder_id", id).in("state", ["approved", "invited", "requested"]).gte("events.date", today);
+  for (const r of live ?? []) {
+    const { error } = await supabase.rpc("place_trader", { ev: r.event_id, sh: id, to_state: "pool" });
+    if (error) throw new Error(error.message);
+  }
+  const { error } = await supabase.from("stallholders").update({ deleted_at: new Date().toISOString() }).eq("id", id).eq("organiser_id", org.id);
+  if (error) throw new Error(error.message);
+  refresh();
+  redirect("/admin/traders");
+}
+
+export async function restoreTrader(formData: FormData) {
+  const { supabase, org } = await currentOrganiser();
+  const { error } = await supabase.from("stallholders").update({ deleted_at: null }).eq("id", String(formData.get("id"))).eq("organiser_id", org.id);
+  if (error) throw new Error(error.message);
+  refresh();
+  revalidatePath("/admin/traders/deleted");
 }

@@ -1,4 +1,5 @@
 "use client";
+import Link from "next/link";
 import { useOptimistic, useTransition } from "react";
 import type { Category, Market, Stallholder } from "@/lib/types";
 import { setCategory, toggleMarket } from "./actions";
@@ -32,6 +33,9 @@ export function TraderRow({ trader, markets, categories, ticked }: { trader: Sta
           </td>
         );
       })}
+      <td className="px-2 py-2.5 text-right">
+        <Link href={`/admin/traders/${trader.id}/edit`} className="btn btn-ghost !px-2.5 !py-1 text-xs">Edit</Link>
+      </td>
     </tr>
   );
 }
