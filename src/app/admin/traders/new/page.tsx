@@ -8,7 +8,7 @@ const field = "w-full rounded-xl border border-line bg-white/60 px-3 py-2 text-b
 export default async function NewTrader() {
   const { supabase, org } = await currentOrganiser();
   const [{ data: markets }, { data: categories }] = await Promise.all([
-    supabase.from("markets").select("id, name").eq("organiser_id", org.id).order("name"),
+    supabase.from("markets").select("id, name").eq("organiser_id", org.id).is("deleted_at", null).order("name"),
     supabase.from("categories").select("id, name").eq("organiser_id", org.id).order("sort"),
   ]);
   return (

@@ -5,7 +5,7 @@ import { ImportForm } from "./form";
 export default async function Import() {
   const { supabase, org } = await currentOrganiser();
   const [{ data: markets }, { data: categories }] = await Promise.all([
-    supabase.from("markets").select("name").eq("organiser_id", org.id).order("name"),
+    supabase.from("markets").select("name").eq("organiser_id", org.id).is("deleted_at", null).order("name"),
     supabase.from("categories").select("name").eq("organiser_id", org.id).order("sort"),
   ]);
   return (

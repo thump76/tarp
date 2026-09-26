@@ -21,3 +21,16 @@ export async function sendEmail({ to, subject, text }: { to: string; subject: st
 export function siteUrl(path = "") {
   return `${process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000"}${path}`;
 }
+
+type Bank = { bank_account_name: string | null; bank_sort_code: string | null; bank_account_number: string | null; payment_note: string | null } | null;
+
+/** The "how to pay" paragraph for invoice emails. Empty when no bank details are set. */
+export function paymentBlock(bank: Bank, reference: string) {
+  if (!bank?.bank_account_number) return `Payment reference: ${reference}. The organiser will tell you how to pay.`;
+  return [
+    `Pay by bank transfer, quoting the reference ${reference}:`,
+    `  ${bank.bank_account_name ?? ""}`,
+    `  Sort code ${bank.bank_sort_code ?? ""}, account ${bank.bank_account_number}`,
+    bank.payment_note ? `\n${bank.payment_note}` : "",
+  ].filter(Boolean).join("\n");
+}

@@ -7,25 +7,26 @@ import { answerInvite } from "./actions";
 export const dynamic = "force-dynamic";
 
 type Profile = {
-  id: string; status: string; business_name: string;
+  id: string; status: string; business_name: string; organiser_id: string;
   organisers: { name: string; slug: string };
   stallholder_markets: { markets: { name: string; slug: string; recurrence_note: string | null } }[];
 };
 type Row = {
   id: string; state: string; notified_at: string | null;
   events: { date: string; markets: { name: string; slug: string } };
-  invoices: { amount_pence: number; due_date: string; status: string; payment_url: string | null } | null;
+  invoices: { reference: string; amount_pence: number; due_date: string; status: string; payment_url: string | null } | null;
 };
+type Bank = { bank_account_name: string | null; bank_sort_code: string | null; bank_account_number: string | null; payment_note: string | null };
 
 export default async function Me() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   const [{ data: profiles }, { data: reqs }] = await Promise.all([
     supabase.from("stallholders")
-      .select("id, status, business_name, organisers(name, slug), stallholder_markets(markets(name, slug, recurrence_note))")
-      .eq("user_id", user!.id),
+      .select("id, status, business_name, organiser_id, organisers(name, slug), stallholder_markets(markets(name, slug, recurrence_note))")
+      .eq("user_id", user!.id).is("deleted_at", null),
     supabase.from("requests")
-      .select("id, state, notified_at, events!inner(date, markets(name, slug)), invoices(amount_pence, due_date, status, payment_url)")
+      .select("id, state, notified_at, events!inner(date, markets(name, slug)), invoices(reference, amount_pence, due_date, status, payment_url)")
       .gte("events.date", todayIso()),
   ]);
   const me = (profiles ?? []) as unknown as Profile[];
@@ -35,6 +36,11 @@ export default async function Me() {
     .sort((a, b) => a.events.date.localeCompare(b.events.date));
   const invites = rows.filter((r) => r.state === "invited");
   const booked = rows.filter((r) => r.state !== "invited");
+  // bank details, only when something is owed
+  const owes = booked.some((r) => r.state === "approved" && r.invoices?.status === "unpaid");
+  const approvedOrg = me.find((p) => p.status === "approved")?.organiser_id;
+  const { data: bankRows } = owes && approvedOrg ? await supabase.rpc("my_payment_details", { org: approvedOrg }) : { data: null };
+  const bank = (bankRows as Bank[] | null)?.[0] ?? null;
 
   return (
     <Shell nav={<AuthNav signedIn={!!user} />}>
@@ -109,7 +115,7 @@ export default async function Me() {
                   {r.state === "approved" && <Chip kind="appr">Attending</Chip>}
                   {(r.state === "declined" || r.state === "withdrawn" || r.state === "released") && <Chip kind="avail">Not attending</Chip>}
                   {r.invoices?.status === "unpaid" && r.state === "approved" && (
-                    <span className="tnum">{fmtMoney(r.invoices.amount_pence)} due {fmtDate(r.invoices.due_date)}
+                    <span className="tnum">{fmtMoney(r.invoices.amount_pence)} due {fmtDate(r.invoices.due_date)} <span className="text-muted">· ref</span> <b className="font-semibold">{r.invoices.reference}</b>
                       {r.invoices.payment_url && <a href={r.invoices.payment_url} className="btn btn-primary ml-3">Pay</a>}
                     </span>
                   )}
@@ -118,6 +124,16 @@ export default async function Me() {
               </Card>
             ))}
           </div>
+          {owes && (
+            <Card className="mt-4 text-sm">
+              <b className="font-semibold text-ink-strong">How to pay.</b>{" "}
+              {bank?.bank_account_number ? (
+                <>Bank transfer to <b className="font-semibold">{bank.bank_account_name}</b>, sort code <span className="tnum">{bank.bank_sort_code}</span>, account <span className="tnum">{bank.bank_account_number}</span>. Use the invoice reference (for example {booked.find((r) => r.invoices?.status === "unpaid")?.invoices?.reference}) as the payment reference so it is matched to you.{bank.payment_note ? <span className="text-muted"> {bank.payment_note}</span> : null}</>
+              ) : (
+                <>Quote the invoice reference when you pay. The organiser will tell you how.</>
+              )}
+            </Card>
+          )}
         </section>
       )}
     </Shell>

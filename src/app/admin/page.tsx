@@ -1,29 +1,35 @@
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/server";
+import { currentOrganiser } from "@/lib/admin";
 import { Card, PitchBar, Chip, Stat } from "@/components/ui";
-import { fmtDate, fmtMonth, fmtMoney, todayIso, addMonthsIso, daysUntil } from "@/lib/format";
-import type { EventMix, PublicEvent } from "@/lib/types";
+import { fmtDate, fmtMonth, fmtMoney, daysUntil, monthKeys, endOfMonthIso, archiveCutoffIso, isPast } from "@/lib/format";
+import type { EventMix, OrganiserEvent } from "@/lib/types";
 import { MixPanel } from "./mix-panel";
 
 export const dynamic = "force-dynamic";
 
+const MONTHS = 6;
+
 export default async function AdminCalendar({ searchParams }: { searchParams: Promise<{ e?: string }> }) {
   const { e: selectedId } = await searchParams;
-  const supabase = await createClient();
-  const from = todayIso(), to = addMonthsIso(3);
+  const { supabase, org } = await currentOrganiser();
+  const months = monthKeys(MONTHS);
 
-  const [{ data: events }, { count: waiting }, { data: unpaid }] = await Promise.all([
-    supabase.from("public_events").select("*").gte("date", from).lte("date", to).order("date").returns<PublicEvent[]>(),
+  const [{ data: events }, { count: waiting }, { data: unpaid }, { count: archived }] = await Promise.all([
+    // this month and the next five; finished dates stay (greyed) for 48 hours, then move to the archive
+    supabase.from("organiser_events").select("*").eq("organiser_id", org.id).is("deleted_at", null)
+      .gte("ends_at", archiveCutoffIso()).lte("date", endOfMonthIso(MONTHS)).order("date").returns<OrganiserEvent[]>(),
     supabase.from("requests").select("id", { count: "exact", head: true }).eq("state", "requested"),
     supabase.from("invoices").select("amount_pence, due_date, request_id, requests!inner(event_id)").eq("status", "unpaid"),
+    supabase.from("organiser_events").select("id", { count: "exact", head: true }).eq("organiser_id", org.id).is("deleted_at", null).lt("ends_at", archiveCutoffIso()),
   ]);
 
   const list = events ?? [];
-  const selected = list.find((x) => x.id === selectedId) ?? list[0];
+  const upcoming = list.filter((x) => !isPast(x.ends_at));
+  const selected = list.find((x) => x.id === selectedId) ?? upcoming[0];
   const { data: mix } = selected
     ? await supabase.from("event_mix").select("*").eq("event_id", selected.id).order("sort").returns<EventMix[]>()
     : { data: [] as EventMix[] };
-  const { data: categories } = await supabase.from("categories").select("id, name, cap, colour, sort").order("sort");
+  const { data: categories } = await supabase.from("categories").select("id, name, cap, colour, sort").eq("organiser_id", org.id).order("sort");
 
   const unpaidByEvent = new Map<string, number>();
   let dueSoonPence = 0, dueSoonCount = 0;
@@ -33,17 +39,18 @@ export default async function AdminCalendar({ searchParams }: { searchParams: Pr
     if (daysUntil(i.due_date) <= 7) { dueSoonPence += i.amount_pence; dueSoonCount++; }
   }
 
-  const byMonth = new Map<string, PublicEvent[]>();
-  for (const ev of list) byMonth.set(ev.date.slice(0, 7), [...(byMonth.get(ev.date.slice(0, 7)) ?? []), ev]);
-  const next = list[0];
+  const byMonth = new Map<string, OrganiserEvent[]>(months.map((k) => [k, []]));
+  for (const ev of list) byMonth.get(ev.date.slice(0, 7))?.push(ev);
+  const next = upcoming[0];
 
   return (
     <>
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="text-4xl font-bold">Next three months</h1>
-          <p className="mt-1 text-muted">{list.length} market days. Tap a date to build its line-up.</p>
+          <h1 className="text-4xl font-bold">Next six months</h1>
+          <p className="mt-1 text-muted">{upcoming.length} market days. Tap a date to build its line-up.</p>
         </div>
+        <Link href="/admin/event/new" className="btn btn-primary">Create event date</Link>
       </div>
 
       <div className="mt-6 grid gap-3 sm:grid-cols-3">
@@ -57,37 +64,44 @@ export default async function AdminCalendar({ searchParams }: { searchParams: Pr
       <div className="mt-8 grid gap-6 md:grid-cols-3">
         {[...byMonth.entries()].map(([k, evs]) => (
           <section key={k}>
-            <h2 className="mb-3 text-lg font-semibold">{fmtMonth(evs[0].date)}</h2>
+            <h2 className="mb-3 text-lg font-semibold">{fmtMonth(`${k}-01`)}</h2>
             <div className="flex flex-col gap-3">
               {evs.map((ev) => {
                 const unpaidN = unpaidByEvent.get(ev.id) ?? 0;
                 const sel = ev.id === selected?.id;
+                const past = isPast(ev.ends_at);
                 return (
                   <Link key={ev.id} href={`/admin/event/${ev.id}`}
-                    className={`block rounded-2xl bg-card p-3.5 transition hover:shadow-sm ${sel ? "outline-2 outline-ink-strong" : ""}`}>
+                    className={`block rounded-2xl bg-card p-3.5 transition hover:shadow-sm ${sel ? "outline-2 outline-ink-strong" : ""} ${past ? "is-past" : ""}`}>
                     <div className="flex items-baseline justify-between gap-2">
                       <span className="display text-lg font-semibold">{fmtDate(ev.date)}</span>
                       <span className="text-xs text-muted">{ev.market_name}</span>
                     </div>
-                    <div className="mt-2"><PitchBar approved={ev.approved} requested={ev.requested} max={ev.max_pitches} /></div>
+                    {ev.theme && <div className="mt-0.5 text-sm text-muted">{ev.theme}</div>}
+                    <div className="mt-2"><PitchBar approved={ev.approved} requested={ev.requested + ev.invited} max={ev.max_pitches} /></div>
                     <div className="mt-2 flex justify-between text-xs text-muted tnum">
-                      <span><b className="font-semibold text-ink">{ev.approved}</b> of {ev.max_pitches} approved{ev.requested ? <>, <b className="font-semibold text-ink">{ev.requested}</b> requested</> : null}</span>
-                      <span className={ev.available <= 3 ? "font-semibold text-red" : ""}>{ev.available} left</span>
+                      <span><b className="font-semibold text-ink">{ev.approved}</b> of {ev.max_pitches} attending{ev.requested ? <>, <b className="font-semibold text-ink">{ev.requested}</b> requested</> : null}</span>
+                      {past ? <span>Finished</span> : <span className={ev.max_pitches - ev.approved - ev.invited - ev.requested <= 3 ? "font-semibold text-red" : ""}>{ev.max_pitches - ev.approved - ev.invited - ev.requested} left</span>}
                     </div>
-                    {(unpaidN > 0 || ev.note) && (
-                      <div className="mt-2 flex justify-between text-xs">
-                        {unpaidN > 0 ? <Chip kind="due">{unpaidN} unpaid</Chip> : <span />}
-                        {ev.note && <span className="text-muted">{ev.note}</span>}
-                      </div>
-                    )}
+                    {unpaidN > 0 && <div className="mt-2 text-xs"><Chip kind="due">{unpaidN} unpaid</Chip></div>}
                   </Link>
                 );
               })}
+              {!evs.length && (
+                <div className="rounded-2xl border border-dashed border-line p-3.5 text-sm text-muted">
+                  No dates. <Link href={`/admin/event/new?month=${k}`} className="underline">Add one</Link>
+                </div>
+              )}
             </div>
           </section>
         ))}
       </div>
-      {!list.length && <Card className="mt-6">No published events in the next three months.</Card>}
+
+      {!list.length && <Card className="mt-6">No dates in the next six months yet. Start with Create event date.</Card>}
+
+      <div className="mt-10 flex flex-wrap gap-4">
+        <Link href="/admin/archive" className="link-secondary">Archive{archived ? ` (${archived} past dates)` : ""}</Link>
+      </div>
     </>
   );
 }

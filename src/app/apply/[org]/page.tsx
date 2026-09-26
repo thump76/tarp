@@ -11,7 +11,7 @@ export default async function Apply({ params }: { params: Promise<{ org: string 
   const { data: organiser } = await supabase.from("organisers").select("id, name, slug").eq("slug", org).maybeSingle();
   if (!organiser) notFound();
   const [{ data: markets }, { data: categories }] = await Promise.all([
-    supabase.from("markets").select("*").eq("organiser_id", organiser.id).order("name").returns<Market[]>(),
+    supabase.from("markets").select("*").eq("organiser_id", organiser.id).is("deleted_at", null).order("name").returns<Market[]>(),
     supabase.from("categories").select("*").eq("organiser_id", organiser.id).order("sort").returns<Category[]>(),
   ]);
 

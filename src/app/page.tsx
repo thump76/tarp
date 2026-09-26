@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 export default async function Home() {
   const supabase = await createClient();
   const [{ data: markets }, { data: events }, { data: { user } }] = await Promise.all([
-    supabase.from("markets").select("*").order("name"),
+    supabase.from("markets").select("*").is("deleted_at", null).order("name"),
     supabase.from("public_events").select("*").gte("date", todayIso()).order("date"),
     supabase.auth.getUser(),
   ]);

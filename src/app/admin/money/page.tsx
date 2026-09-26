@@ -6,7 +6,7 @@ import { markPaid, release, remind } from "../actions";
 export const dynamic = "force-dynamic";
 
 type Row = {
-  id: string; amount_pence: number; due_date: string; status: string; paid_at: string | null;
+  id: string; reference: string; amount_pence: number; due_date: string; status: string; paid_at: string | null;
   requests: { id: string; state: string; events: { id: string; date: string; markets: { name: string } }; stallholders: { business_name: string; categories: { name: string } | null } };
   reminders: { sent_at: string }[];
 };
@@ -15,7 +15,7 @@ export default async function Money() {
   const supabase = await createClient();
   const { data } = await supabase
     .from("invoices")
-    .select("id, amount_pence, due_date, status, paid_at, requests!inner(id, state, events(id, date, markets(name)), stallholders(business_name, categories(name))), reminders(sent_at)")
+    .select("id, reference, amount_pence, due_date, status, paid_at, requests!inner(id, state, events(id, date, markets(name)), stallholders(business_name, categories(name))), reminders(sent_at)")
     .in("status", ["unpaid", "paid"])
     .order("due_date");
   const rows = (data ?? []) as unknown as Row[];
@@ -36,7 +36,7 @@ export default async function Money() {
   return (
     <>
       <h1 className="text-4xl font-bold">Unpaid pitches</h1>
-      <p className="mt-1 text-muted">Reminders at 7 and 2 days before due arrive with the email integration. Until then, mark paid by hand and send reminders yourself.</p>
+      <p className="mt-1 text-muted">Traders quote the reference on their bank transfer. Match it against your bank feed and mark paid. Reminders at 7 and 2 days before due arrive with the email integration.</p>
 
       <div className="mt-6 grid gap-3 sm:grid-cols-3">
         <Stat label="Outstanding" value={fmtMoney(sum(unpaid))} sub={`${unpaid.length} pitches`} />
@@ -78,7 +78,7 @@ function Group({ g }: { g: { label: string; rows: Row[] } }) {
           <tr key={r.id} className="border-t border-line">
             <td className="px-4 py-3">
               <div className="font-semibold text-ink-strong">{r.requests.stallholders.business_name}</div>
-              <div className="text-xs text-muted">{r.requests.stallholders.categories?.name ?? "No category"}{last ? ` · reminded ${fmtDate(last)}` : ""}</div>
+              <div className="text-xs text-muted"><span className="tnum font-semibold text-ink">{r.reference}</span> · {r.requests.stallholders.categories?.name ?? "No category"}{last ? ` · reminded ${fmtDate(last)}` : ""}</div>
             </td>
             <td className="px-4 py-3">
               {over ? <Chip kind="due">Overdue {Math.abs(d)} day{Math.abs(d) === 1 ? "" : "s"}</Chip>
