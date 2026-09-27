@@ -1,6 +1,6 @@
 /**
  * Photos for the home page. Drop the file in public/images/home/ with the name below and set
- * `ready: false`. Until then the page shows a placeholder the same shape, and in development it
+ * `ready: true`. Until then the page shows a placeholder the same shape, and in development it
  * also prints the file name and a prompt you can use for a stand-in (Nano Banana, Midjourney etc).
  *
  * Aim for JPEGs around 2400px on the long side; next/image resizes them per device.
@@ -15,7 +15,7 @@ const STYLE =
 export const HOME_PHOTOS: Record<PhotoSlot, PhotoSpec> = {
   hero: {
     file: "hero.jpg",
-    ready: true,
+    ready: false,
     alt: "Shoppers browsing produce stalls at a busy weekend market",
     ratio: "4:5 portrait",
     prompt: `A busy Sunday farmers' market seen at eye level along a row of stalls with canvas gazebos. Shoppers with tote bags browse crates of vegetables and loaves; a stallholder in an apron chats to a customer. ${STYLE}`,
