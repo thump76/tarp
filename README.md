@@ -78,6 +78,10 @@ Plans live in `src/lib/plans.ts`: Starter £10 a month (1 location, 2 admins) an
 
 **Limits.** Starter can't add a second location or a third admin; the buttons turn into upgrade links. An organiser with no `organiser_billing` row (The Producers Markets) counts as Business and is never billed. If a payment fails or the subscription ends, the organiser view shows a red banner linking to billing; nothing is locked yet.
 
+## Home page photos
+
+Six photo slots are listed in `src/lib/photos.ts` (hero, organiser, three for the strip, and the dusk shot behind the last call to action). To fill one, save a JPEG about 2400px on the long side as `public/images/home/<file>` and set `ready: true`. Until then a striped placeholder holds the space; in `npm run dev` it also shows the file name, the shape and a prompt for an AI stand-in.
+
 ## How traders get onto a market
 
 1. **Apply once.** New traders fill in `/apply/producers-markets`. No account needed; they sign in later with the same email.
