@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
-import { currentMembership } from "@/lib/admin";
+import Link from "next/link";
+import { currentMembership, currentPlan } from "@/lib/admin";
 import { Shell, Card } from "@/components/ui";
 import { CogIcon, NavLink, SignOut } from "@/components/nav-link";
 
@@ -20,6 +21,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     );
   }
 
+  const { lapsed, billing } = await currentPlan(supabase, org.id);
   const { count: applications } = await supabase.from("stallholders").select("id", { count: "exact", head: true })
     .eq("organiser_id", org.id).eq("status", "applied").is("deleted_at", null);
   const nav = (
@@ -37,6 +39,12 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   return (
     <Shell nav={nav}>
       <div className="mb-4 text-xs font-semibold uppercase tracking-wider text-muted">{org.name}</div>
+      {lapsed && (
+        <div role="status" className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-red-bg px-4 py-3 text-sm text-red">
+          <span>{billing?.status === "canceled" ? "Your Tarp subscription has ended." : "Your last Tarp payment didn't go through."} Traders can still see your markets, but please sort out billing to keep using Tarp.</span>
+          <Link href="/admin/settings#billing" className="btn btn-danger !py-1.5">Go to billing</Link>
+        </div>
+      )}
       {children}
     </Shell>
   );

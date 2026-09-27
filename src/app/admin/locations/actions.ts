@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { currentOrganiser } from "@/lib/admin";
+import { currentOrganiser, currentPlan, assertWithin } from "@/lib/admin";
 
 function refresh() {
   revalidatePath("/admin", "layout");
@@ -34,6 +34,9 @@ function read(formData: FormData) {
 
 export async function createLocation(formData: FormData) {
   const { supabase, org } = await currentOrganiser();
+  const { plan } = await currentPlan(supabase, org.id);
+  const { count } = await supabase.from("markets").select("id", { count: "exact", head: true }).eq("organiser_id", org.id).is("deleted_at", null);
+  assertWithin(plan.maxLocations, count ?? 0, plan.maxLocations === 1 ? "location" : "locations");
   const row = read(formData);
   // slug from the name, with a numeric suffix if it is taken within this organiser
   const base = slugify(row.name);

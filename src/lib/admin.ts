@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import type { Member } from "@/lib/types";
+import { PLANS, type PlanId } from "@/lib/plans";
 
 type Org = { id: string; name: string; slug: string };
 
@@ -22,4 +23,27 @@ export async function currentOrganiser() {
   if (!user) redirect("/login?next=/admin");
   if (!member || !org) redirect("/admin");
   return { supabase, org, member, user };
+}
+
+export type Billing = {
+  organiser_id: string; plan: PlanId; stripe_customer_id: string | null; status: string | null;
+  current_period_end: string | null; trial_end: string | null; cancel_at_period_end: boolean;
+};
+
+/**
+ * The organiser's plan. No billing row means an organiser set up by hand before self-serve
+ * sign-up (The Producers Markets): treated as Business and never billed.
+ */
+export async function currentPlan(supabase: Awaited<ReturnType<typeof createClient>>, orgId: string) {
+  const { data } = await supabase.from("organiser_billing").select("*").eq("organiser_id", orgId).maybeSingle<Billing>();
+  const plan = PLANS[data?.plan ?? "business"];
+  const lapsed = !!data && !["trialing", "active"].includes(data.status ?? "");
+  return { billing: data, plan, comped: !data, lapsed };
+}
+
+/** Throws a friendly error when a plan limit would be passed. */
+export function assertWithin(limit: number | null, used: number, what: string) {
+  if (limit !== null && used >= limit) {
+    throw new Error(`Your plan includes ${limit} ${what}. Upgrade to Business under Settings, Billing to add more.`);
+  }
 }

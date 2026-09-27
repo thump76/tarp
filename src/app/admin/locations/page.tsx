@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { currentOrganiser } from "@/lib/admin";
+import { currentOrganiser, currentPlan } from "@/lib/admin";
 import { Card } from "@/components/ui";
 import { fmtDate, fmtMoney, todayIso } from "@/lib/format";
 import type { Market, OrganiserEvent } from "@/lib/types";
@@ -14,6 +14,8 @@ export default async function Locations() {
       .gte("date", todayIso()).order("date").returns<Pick<OrganiserEvent, "id" | "market_id" | "date" | "theme">[]>(),
     supabase.from("stallholder_markets").select("market_id, stallholders!inner(deleted_at, status)").eq("stallholders.status", "approved").is("stallholders.deleted_at", null),
   ]);
+  const { plan } = await currentPlan(supabase, org.id);
+  const full = plan.maxLocations !== null && (markets?.length ?? 0) >= plan.maxLocations;
   const nextFor = (id: string) => upcoming?.filter((e) => e.market_id === id) ?? [];
   const poolFor = (id: string) => pools?.filter((p) => p.market_id === id).length ?? 0;
 
@@ -24,7 +26,11 @@ export default async function Locations() {
           <h1 className="text-4xl font-bold">Locations</h1>
           <p className="mt-1 text-muted">A location is a venue with its own dates, pool of traders and public page.</p>
         </div>
-        <Link href="/admin/locations/new" className="btn btn-primary">Add a location</Link>
+        {full ? (
+          <Link href="/admin/settings#billing" className="btn btn-ghost" title={`${plan.name} includes ${plan.maxLocations} location`}>Upgrade to add another location</Link>
+        ) : (
+          <Link href="/admin/locations/new" className="btn btn-primary">Add a location</Link>
+        )}
       </div>
 
       <div className="mt-8 grid gap-4 sm:grid-cols-2">

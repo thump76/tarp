@@ -46,7 +46,7 @@ export default async function MarketPage({ params }: { params: Promise<{ slug: s
 
   return (
     <Shell nav={<AuthNav signedIn={!!user} />}>
-      <Link href="/" className="text-sm text-muted hover:underline">All markets</Link>
+      <Link href="/markets" className="text-sm text-muted hover:underline">All markets</Link>
       <h1 className="mt-2 text-4xl font-bold">{market.name}</h1>
       <p className="mt-2 text-muted">{market.venue}{market.postcode ? `, ${market.postcode}` : ""}. {market.recurrence_note}.</p>
 

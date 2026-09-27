@@ -14,7 +14,12 @@ The core loop: an event has N pitches. A stallholder requests one. The organiser
 
 | Route | Who | What |
 |---|---|---|
-| `/` | anyone | list of markets with next date and pitches left, Apply to trade |
+| `/` | anyone | selling page for organisers: problem, how it works, features, pricing, FAQ |
+| `/pricing` | anyone | Starter and Business cards, full comparison table, FAQ |
+| `/signup` | anyone | pick a plan, market name, email, then Stripe Checkout |
+| `/signup/complete` | buyer | Stripe returns here; creates the organiser and signs them straight in |
+| `/api/stripe/webhook` | Stripe | creates organisers and keeps plan and status in step |
+| `/markets` | anyone | list of markets with next date and pitches left, Apply to trade |
 | `/apply/[org]` | anyone | trader application: business, category, products, links, markets wanted |
 | `/m/[slug]` | anyone | public calendar for one market; approved traders ticked for it can request a pitch |
 | `/me` | trader | their markets, invitations (yes / can't make it), bookings and invoices |
@@ -42,12 +47,36 @@ The core loop: an event has N pitches. A stallholder requests one. The organiser
    - `supabase/seed.sql` (The Producers Markets, 2026 dates)
    - `supabase/migrations/0002_traders_and_board.sql`
    - `supabase/migrations/0003_locations_dates_team.sql`
+   - `supabase/migrations/0004_plans_and_billing.sql`
 2. **Auth.** Authentication > Providers > Email: leave "Confirm email" on, turn "Enable email OTP / magic link" on. Under URL Configuration add your site URL and `http://localhost:3000/auth/callback` plus the Vercel URL `/auth/callback` to redirect URLs.
 3. **Env.** `cp .env.example .env.local` and fill in the project URL and anon key from Project Settings > API.
 4. **Run.** `npm install && npm run dev`, open http://localhost:3000.
 5. **Admins.** Migration 0003 seeds `philipbrumpton@gmail.com` (Philip) and `info@cceventsuk.com` (Chris) as owners of The Producers Markets. Each signs in once at `/login` with that address and the organiser view is theirs. Further admins are added under Settings, Team; they get a sign-in link by email and the row attaches to them on first sign-in.
 
 6. **Deploy.** `npx vercel` from the repo, set the same three env vars in the Vercel project, set `NEXT_PUBLIC_SITE_URL` to the Vercel URL.
+
+## Selling Tarp (plans, Stripe, sign-up)
+
+Plans live in `src/lib/plans.ts`: Starter £10 a month (1 location, 2 admins) and Business £40 a month (unlimited). The pricing cards, the comparison table, Checkout and the limits in the organiser area all read from that file.
+
+**How a sign-up works.** `/signup` sends the buyer to Stripe Checkout with the plan, market name and their name in the metadata. When they pay (or start the free trial), Stripe sends them to `/signup/complete`, which calls `provision_organiser()` to create the organiser, its owner, settings and starter categories, then signs them straight into `/admin?welcome=1`. The webhook does the same thing in case they close the tab; the database function locks on the Checkout session id, so it never creates two. The instant sign-in link works once and only for two hours; after that they sign in with the usual email link.
+
+**Set up**
+
+1. Run `supabase/migrations/0004_plans_and_billing.sql`.
+2. Create the prices: `STRIPE_SECRET_KEY=sk_test_... node scripts/stripe-setup.mjs` (test key first, then live).
+3. Stripe dashboard, Settings, Billing, Customer portal: turn on switching plans (add both products), updating cards and cancelling.
+4. Stripe dashboard, Developers, Webhooks: add `https://<site>/api/stripe/webhook` with `checkout.session.completed`, `customer.subscription.updated`, `customer.subscription.deleted`. For local testing: `stripe listen --forward-to localhost:3000/api/stripe/webhook`.
+5. Env vars (local and Vercel):
+
+| Var | What |
+|---|---|
+| `STRIPE_SECRET_KEY` | `sk_test_...` or `sk_live_...` |
+| `STRIPE_WEBHOOK_SECRET` | `whsec_...` from the webhook endpoint |
+| `SUPABASE_SERVICE_ROLE_KEY` | Project Settings, API. Server only, never prefix with `NEXT_PUBLIC_` |
+| `NEXT_PUBLIC_TRIAL_DAYS` | Free trial length, default 14. `0` turns the trial off and the copy follows |
+
+**Limits.** Starter can't add a second location or a third admin; the buttons turn into upgrade links. An organiser with no `organiser_billing` row (The Producers Markets) counts as Business and is never billed. If a payment fails or the subscription ends, the organiser view shows a red banner linking to billing; nothing is locked yet.
 
 ## How traders get onto a market
 
@@ -96,4 +125,6 @@ Bank transfer is the default. Every invoice has a reference (`TARP-0001`, prefix
 - Bank statement CSV import to match references and bulk-mark paid.
 - Reminder emails (Resend). "Send reminder" records the reminder; the email itself is next.
 - Waiting list, layout map, documents (insurance expiry).
-- iPad app (SwiftUI) against the same Supabase API.
+- iPad app (SwiftUI) against the same Supabase API. Free to download; organisers subscribe on the website.
+- Yearly plans. Add a second price per plan with lookup keys `tarp_*_yearly` and a toggle on the pricing page.
+- Locking the organiser view when a subscription has lapsed for more than a week.

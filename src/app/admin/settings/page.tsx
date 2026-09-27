@@ -1,9 +1,11 @@
-import { currentOrganiser } from "@/lib/admin";
+import Link from "next/link";
+import { currentOrganiser, currentPlan } from "@/lib/admin";
+import { pounds } from "@/lib/plans";
 import { Card, Chip } from "@/components/ui";
 import { Field, field } from "@/components/form";
 import { fmtDate } from "@/lib/format";
 import type { Category, Member, OrganiserSettings } from "@/lib/types";
-import { inviteAdmin, removeAdmin, savePayments } from "./actions";
+import { inviteAdmin, removeAdmin, savePayments, openBillingPortal } from "./actions";
 import { Categories } from "./categories";
 
 export const dynamic = "force-dynamic";
@@ -19,6 +21,8 @@ export default async function Settings() {
   const counts: Record<string, number> = {};
   for (const t of traderCats ?? []) if (t.category_id) counts[t.category_id] = (counts[t.category_id] ?? 0) + 1;
   const owners = (team ?? []).filter((m) => m.role === "owner").length;
+  const { billing, plan, comped } = await currentPlan(supabase, org.id);
+  const adminsFull = plan.maxAdmins !== null && (team?.length ?? 0) >= plan.maxAdmins;
 
   return (
     <>
@@ -49,11 +53,17 @@ export default async function Settings() {
               );
             })}
           </ul>
+          {adminsFull ? (
+            <p className="mt-5 border-t border-line pt-5 text-sm text-muted">
+              {plan.name} includes {plan.maxAdmins} admins. <a href="#billing" className="underline">Upgrade to Business</a> for as many as you need.
+            </p>
+          ) : (
           <form action={inviteAdmin} className="mt-5 grid gap-3 border-t border-line pt-5 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
             <Field label="Add an admin"><input name="email" type="email" required placeholder="Email" className={field} /></Field>
             <Field label="Name"><input name="name" placeholder="Optional" className={field} /></Field>
             <button className="btn btn-primary">Add and email</button>
           </form>
+          )}
         </Card>
       </section>
 
@@ -102,8 +112,38 @@ export default async function Settings() {
           </div>
         </div>
       </section>
+
+      {/* ---------- billing ---------- */}
+      <section id="billing" className="mt-12 scroll-mt-6">
+        <h2 className="text-2xl font-semibold">Billing</h2>
+        <Card className="mt-4 max-w-2xl">
+          <div className="flex flex-wrap items-baseline justify-between gap-3">
+            <div>
+              <div className="display text-xl font-semibold">Tarp {plan.name}</div>
+              <div className="text-sm text-muted">{comped ? "Founding organiser, no charge" : `${pounds(plan.pence)} a month`}</div>
+            </div>
+            {billing && <div className="flex items-center gap-2"><BillingStatus status={billing.status} cancelAtEnd={billing.cancel_at_period_end} periodEnd={billing.current_period_end} trialEnd={billing.trial_end} /></div>}
+          </div>
+          {billing?.stripe_customer_id ? (
+            <form action={openBillingPortal} className="mt-4 flex flex-wrap items-center gap-3 border-t border-line pt-4">
+              <button className="btn btn-primary">Manage billing</button>
+              <span className="text-xs text-muted">Change plan, update your card, download receipts or cancel. Opens Stripe.</span>
+            </form>
+          ) : null}
+          <p className="mt-3 text-xs text-muted"><Link href="/pricing#compare" className="underline">Compare plans</Link></p>
+        </Card>
+      </section>
     </>
   );
+}
+
+function BillingStatus({ status, cancelAtEnd, periodEnd, trialEnd }: { status: string | null; cancelAtEnd: boolean; periodEnd: string | null; trialEnd: string | null }) {
+  const d = (v: string | null) => (v ? fmtDate(v.slice(0, 10)) : "");
+  if (status === "trialing") return <><Chip kind="appr">Free trial</Chip><span className="text-sm text-muted">First payment {d(trialEnd)}</span></>;
+  if (status === "active" && cancelAtEnd) return <><Chip kind="req">Cancelling</Chip><span className="text-sm text-muted">Access until {d(periodEnd)}</span></>;
+  if (status === "active") return <><Chip kind="appr">Active</Chip><span className="text-sm text-muted">Renews {d(periodEnd)}</span></>;
+  if (status === "past_due" || status === "unpaid") return <><Chip kind="due">Payment failed</Chip><span className="text-sm text-muted">Update your card to keep access</span></>;
+  return <Chip kind="due">{status === "canceled" ? "Cancelled" : status ?? "Unknown"}</Chip>;
 }
 
 function Provider({ name, blurb }: { name: string; blurb: string }) {

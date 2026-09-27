@@ -60,7 +60,7 @@ export function AuthNav({ signedIn }: { signedIn: boolean }) {
     <nav className="flex items-center gap-1 text-sm">
       {signedIn ? (
         <>
-          <NavLink href="/" exact>Markets</NavLink>
+          <NavLink href="/markets" exact>Markets</NavLink>
           <NavLink href="/me">My markets</NavLink>
           <SignOut />
         </>

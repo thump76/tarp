@@ -9,8 +9,8 @@ export const dynamic = "force-dynamic";
 
 const MONTHS = 6;
 
-export default async function AdminCalendar({ searchParams }: { searchParams: Promise<{ e?: string }> }) {
-  const { e: selectedId } = await searchParams;
+export default async function AdminCalendar({ searchParams }: { searchParams: Promise<{ e?: string; welcome?: string }> }) {
+  const { e: selectedId, welcome } = await searchParams;
   const { supabase, org } = await currentOrganiser();
   const months = monthKeys(MONTHS);
 
@@ -45,6 +45,7 @@ export default async function AdminCalendar({ searchParams }: { searchParams: Pr
 
   return (
     <>
+      {welcome && <Welcome org={org} />}
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 className="text-4xl font-bold">Next six months</h1>
@@ -101,5 +102,31 @@ export default async function AdminCalendar({ searchParams }: { searchParams: Pr
         <Link href="/admin/archive" className="link-secondary">Archive{archived ? ` (${archived} past dates)` : ""}</Link>
       </div>
     </>
+  );
+}
+
+/** Shown once, straight after sign-up. */
+function Welcome({ org }: { org: { name: string; slug: string } }) {
+  const steps = [
+    { href: "/admin/locations/new", t: "Add your location", d: "The venue, pitches and pitch price." },
+    { href: "/admin/traders/import", t: "Import your traders", d: "Paste or upload the spreadsheet you use now." },
+    { href: `/apply/${org.slug}`, t: "Share your application link", d: "New traders apply here. Put it on your website and Instagram." },
+    { href: "/admin/settings", t: "Add your bank details", d: "They go on every invoice with a payment reference." },
+  ];
+  return (
+    <Card className="mb-10 !p-6">
+      <h2 className="text-3xl font-bold">Welcome to Tarp</h2>
+      <p className="mt-1 text-muted">{org.name} is ready. Four things to do first:</p>
+      <ol className="mt-5 grid gap-3 sm:grid-cols-2">
+        {steps.map((s, i) => (
+          <li key={s.href}>
+            <Link href={s.href} className="flex gap-3 rounded-2xl bg-cream p-4 transition hover:shadow-sm">
+              <span className="display flex h-8 w-8 flex-none items-center justify-center rounded-full bg-ink-strong text-sm font-semibold !text-cream">{i + 1}</span>
+              <span><b className="font-semibold text-ink-strong">{s.t}</b><span className="block text-sm text-muted">{s.d}</span></span>
+            </Link>
+          </li>
+        ))}
+      </ol>
+    </Card>
   );
 }

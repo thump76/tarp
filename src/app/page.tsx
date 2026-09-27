@@ -1,52 +1,192 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import { Shell, Card, AuthNav } from "@/components/ui";
-import { fmtDate, todayIso } from "@/lib/format";
-import type { Market, PublicEvent } from "@/lib/types";
+import { MarketingShell, Section, Eyebrow, PricingCards, Faq, PricingJsonLd, trialLine } from "@/components/marketing";
+import { TRIAL_DAYS } from "@/lib/plans";
+import { siteUrl } from "@/lib/email";
 
-export const dynamic = "force-dynamic";
+export const metadata: Metadata = {
+  title: "Tarp | Booking, invoicing and calendar for market organisers",
+  description: "Run your market without the spreadsheet. Trader applications, pitch bookings, line-ups and invoices in one place. From £10 a month.",
+  alternates: { canonical: "/" },
+  openGraph: {
+    title: "Tarp | Run your market without the spreadsheet",
+    description: "Trader applications, pitch bookings, line-ups and invoices in one place. From £10 a month.",
+    type: "website",
+    locale: "en_GB",
+  },
+};
+
+const PAINS = [
+  { t: "Applications everywhere", d: "Emails, Instagram DMs, a form from 2019. Half of them missing a photo or a product list." },
+  { t: "A spreadsheet of who's paid", d: "Cross-checked against the bank app on a Sunday night, one reference at a time." },
+  { t: "Chasing the week before", d: "Who's confirmed, who's dropped out, and why are there four candle stalls?" },
+];
+
+const STEPS = [
+  { n: "1", t: "Traders apply once", d: "Share one link. Traders send their business, category, photos and the markets they want. You approve them into a pool for each location." },
+  { n: "2", t: "Build the line-up", d: "Drag regulars from the pool, or copy last month's line-up in one tap. Tarp flags when a category is full." },
+  { n: "3", t: "Invitations go out", d: "Traders say yes from their phone. Confirmed traders move to Attending and get an invoice with a payment reference." },
+  { n: "4", t: "See who's paid", d: "One page shows what's due and what's late, by market date. Mark paid, send a reminder or release the pitch." },
+];
+
+const FEATURES = [
+  { t: "Public calendar", d: "Every date with pitches left, so traders stop asking if there's space." },
+  { t: "Trader pools", d: "Each location has its own list of approved traders, ready to invite." },
+  { t: "Category mix", d: "Set a soft cap per category and see the balance of every date at a glance." },
+  { t: "Spreadsheet import", d: "Bring the traders you already work with. They get an invitation to sign in." },
+  { t: "Payment references", d: "Every invoice gets one, like TARP-0412, so bank transfers match in seconds." },
+  { t: "No passwords", d: "Everyone signs in with an emailed link, on iPad, phone or laptop." },
+];
 
 export default async function Home() {
   const supabase = await createClient();
-  const [{ data: markets }, { data: events }, { data: { user } }] = await Promise.all([
-    supabase.from("markets").select("*").is("deleted_at", null).order("name"),
-    supabase.from("public_events").select("*").gte("date", todayIso()).order("date"),
-    supabase.auth.getUser(),
-  ]);
-  const { data: organisers } = await supabase.from("organisers").select("name, slug").order("name");
-
-  const nextFor = (id: string) => (events as PublicEvent[] | null)?.find((e) => e.market_id === id);
+  const { data: { user } } = await supabase.auth.getUser();
 
   return (
-    <Shell nav={<AuthNav signedIn={!!user} />}>
-      <h1 className="text-4xl font-bold">Markets</h1>
-      <p className="mt-2 max-w-prose text-muted">Upcoming dates and pitch availability. New traders apply once to the organiser; approved traders sign in to request dates.</p>
-      {!user && organisers?.map((o) => (
-        <Card key={o.slug} className="mt-6 flex flex-wrap items-center justify-between gap-3">
-          <span>Want to trade with <b className="font-semibold text-ink-strong">{o.name}</b>?</span>
-          <Link href={`/apply/${o.slug}`} className="btn btn-primary">Apply to trade</Link>
-        </Card>
-      ))}
-      <div className="mt-8 grid gap-4 sm:grid-cols-2">
-        {(markets as Market[] | null)?.map((m) => {
-          const n = nextFor(m.id);
-          return (
-            <Link key={m.id} href={`/m/${m.slug}`} className="block rounded-2xl bg-card p-5 transition hover:shadow-sm focus-visible:outline-2 focus-visible:outline-ink">
-              <div className="display text-xl font-semibold">{m.name}</div>
-              <div className="mt-1 text-sm text-muted">{m.recurrence_note}</div>
-              {n ? (
-                <div className="mt-4 flex items-baseline justify-between text-sm">
-                  <span>Next: <b className="font-semibold text-ink-strong">{fmtDate(n.date)}</b></span>
-                  <span className={`tnum ${n.available <= 3 ? "font-semibold text-red" : "text-muted"}`}>{n.available} of {n.max_pitches} left</span>
-                </div>
-              ) : (
-                <div className="mt-4 text-sm text-muted">No upcoming dates</div>
-              )}
-            </Link>
-          );
-        })}
-        {!markets?.length && <Card>No markets yet. Run the seed and check your Supabase keys.</Card>}
+    <MarketingShell signedIn={!!user}>
+      <PricingJsonLd url={siteUrl("/")} />
+
+      {/* ---------- hero ---------- */}
+      <Section className="grid items-center gap-12 pb-20 pt-10 md:grid-cols-[1.1fr_1fr] md:pt-16">
+        <div>
+          <Eyebrow>For market organisers</Eyebrow>
+          <h1 className="mt-3 text-5xl font-bold leading-[1.05] sm:text-6xl">Run your market without the spreadsheet.</h1>
+          <p className="mt-5 max-w-xl text-lg text-ink">
+            Tarp keeps your dates, traders, pitches and payments in one place. Traders apply and book online, you build the line-up, and every invoice carries a reference so you know who has paid.
+          </p>
+          <div className="mt-8 flex flex-wrap items-center gap-3">
+            <Link href="/signup" className="btn btn-primary !px-6 !py-3 text-base">{TRIAL_DAYS ? `Start your ${TRIAL_DAYS}-day free trial` : "Get started"}</Link>
+            <Link href="/pricing" className="btn btn-ghost !px-6 !py-3 text-base">See pricing</Link>
+          </div>
+          <p className="mt-3 text-sm text-muted">From £10 a month. {trialLine()}</p>
+        </div>
+        <BoardPreview />
+      </Section>
+
+      {/* ---------- the problem ---------- */}
+      <div className="bg-cream-deep/70 py-20">
+        <Section>
+          <Eyebrow>Sound familiar?</Eyebrow>
+          <h2 className="mt-3 max-w-2xl text-4xl font-bold">Most markets are run from an inbox, a spreadsheet and a group chat.</h2>
+          <div className="mt-10 grid gap-5 md:grid-cols-3">
+            {PAINS.map((p) => (
+              <div key={p.t} className="rounded-3xl bg-card p-6">
+                <h3 className="text-xl font-semibold">{p.t}</h3>
+                <p className="mt-2 text-muted">{p.d}</p>
+              </div>
+            ))}
+          </div>
+        </Section>
       </div>
-    </Shell>
+
+      {/* ---------- how it works ---------- */}
+      <Section id="how" className="py-20">
+        <Eyebrow>How it works</Eyebrow>
+        <h2 className="mt-3 max-w-2xl text-4xl font-bold">From application to paid pitch, in four steps.</h2>
+        <ol className="mt-10 grid gap-8 md:grid-cols-4">
+          {STEPS.map((s) => (
+            <li key={s.n}>
+              <div className="display flex h-10 w-10 items-center justify-center rounded-full bg-ink-strong text-lg font-semibold !text-cream">{s.n}</div>
+              <h3 className="mt-4 text-xl font-semibold">{s.t}</h3>
+              <p className="mt-2 text-muted">{s.d}</p>
+            </li>
+          ))}
+        </ol>
+      </Section>
+
+      {/* ---------- features ---------- */}
+      <Section className="pb-20">
+        <div className="grid gap-x-10 gap-y-8 rounded-3xl bg-card p-6 sm:grid-cols-2 sm:p-10 lg:grid-cols-3">
+          {FEATURES.map((f) => (
+            <div key={f.t}>
+              <h3 className="text-lg font-semibold">{f.t}</h3>
+              <p className="mt-1 text-muted">{f.d}</p>
+            </div>
+          ))}
+        </div>
+        <p className="mt-6 text-center text-sm text-muted">
+          Built with market organisers in South East London. Traders never pay to use it.
+        </p>
+      </Section>
+
+      {/* ---------- pricing ---------- */}
+      <div className="bg-cream-deep/70 py-20">
+        <Section>
+          <div className="mx-auto max-w-2xl text-center">
+            <Eyebrow>Pricing</Eyebrow>
+            <h2 className="mt-3 text-4xl font-bold">About the price of one pitch a month.</h2>
+            <p className="mt-3 text-muted">Two plans, no set-up fee, no charge per trader. {trialLine()}</p>
+          </div>
+          <div className="mx-auto mt-10 max-w-4xl"><PricingCards /></div>
+          <p className="mt-6 text-center"><Link href="/pricing#compare" className="link-secondary">Compare the plans in full</Link></p>
+        </Section>
+      </div>
+
+      {/* ---------- FAQ ---------- */}
+      <Section className="py-20">
+        <div className="mx-auto max-w-3xl">
+          <h2 className="text-4xl font-bold">Questions</h2>
+          <div className="mt-8"><Faq /></div>
+        </div>
+      </Section>
+
+      {/* ---------- final call to action ---------- */}
+      <Section className="pb-24">
+        <div className="rounded-3xl bg-ink-strong px-6 py-14 text-center text-cream sm:px-12">
+          <h2 className="text-4xl font-bold !text-cream">Get your next market off the spreadsheet.</h2>
+          <p className="mx-auto mt-3 max-w-xl text-cream/75">Set up takes about ten minutes. Add your location, import your traders and send the first invitations today.</p>
+          <Link href="/signup" className="btn mt-8 bg-cream !px-6 !py-3 text-base text-ink-strong hover:bg-card">{TRIAL_DAYS ? "Start free trial" : "Get started"}</Link>
+        </div>
+      </Section>
+    </MarketingShell>
+  );
+}
+
+/** A static picture of the line-up board, built from the app's own chips so it always looks like the product. */
+function BoardPreview() {
+  const cols: { h: string; kind: "req" | "appr"; items: [string, string][] }[] = [
+    { h: "Requested", kind: "req", items: [["Hollow Oak Bakery", "Bakery"], ["Fern & Wick", "Candles"]] },
+    { h: "Attending", kind: "appr", items: [["Little Roast", "Coffee"], ["Salt Kitchen", "Hot food"], ["Moss & Clay", "Plants"]] },
+  ];
+  return (
+    <div aria-hidden="true" className="relative mx-3 sm:mx-0">
+      <div className="absolute -inset-3 -rotate-2 rounded-[2rem] bg-amber-bg" />
+      <div className="relative rounded-3xl bg-card p-5 shadow-sm sm:p-6">
+        <div className="flex items-baseline justify-between gap-3">
+          <div>
+            <div className="text-xs font-semibold uppercase tracking-wider text-muted">Sunday 4 October</div>
+            <div className="display text-2xl font-semibold">Castle Gardens</div>
+          </div>
+          <span className="tnum text-sm text-muted">26 of 30 booked</span>
+        </div>
+        <div className="mt-3 flex h-2 overflow-hidden rounded-full bg-cream-deep">
+          <i className="block h-full bg-green" style={{ width: "80%" }} />
+          <i className="block h-full bg-amber" style={{ width: "7%" }} />
+        </div>
+        <div className="mt-5 grid grid-cols-2 gap-3">
+          {cols.map((c) => (
+            <div key={c.h} className="rounded-2xl bg-cream p-3">
+              <div className="text-xs font-semibold uppercase tracking-wider text-muted">{c.h}</div>
+              <ul className="mt-2 grid gap-2">
+                {c.items.map(([n, cat]) => (
+                  <li key={n} className="rounded-xl bg-card px-3 py-2 text-sm">
+                    <div className="font-semibold text-ink-strong">{n}</div>
+                    <div className="mt-0.5 flex items-center justify-between gap-2 text-xs text-muted">
+                      {cat}
+                      <span className={`chip chip-${c.kind}`}>{c.kind === "appr" ? "Paid" : "New"}</span>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
+        </div>
+        <div className="mt-4 flex items-center justify-between rounded-2xl bg-red-bg/60 px-3 py-2 text-xs">
+          <span className="font-semibold text-red">Candles 2 of 2</span>
+          <span className="text-red">Category full</span>
+        </div>
+      </div>
+    </div>
   );
 }

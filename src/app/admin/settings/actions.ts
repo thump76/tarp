@@ -1,7 +1,9 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { currentOrganiser } from "@/lib/admin";
+import { redirect } from "next/navigation";
+import { currentOrganiser, currentPlan, assertWithin } from "@/lib/admin";
+import { stripe } from "@/lib/stripe";
 import { sendEmail, siteUrl } from "@/lib/email";
 
 function refresh() {
@@ -15,6 +17,9 @@ export async function inviteAdmin(formData: FormData) {
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
   const name = String(formData.get("name") ?? "").trim() || null;
   if (!email.includes("@")) throw new Error("Enter an email address.");
+  const { plan } = await currentPlan(supabase, org.id);
+  const { count } = await supabase.from("organiser_members").select("id", { count: "exact", head: true }).eq("organiser_id", org.id).is("removed_at", null);
+  assertWithin(plan.maxAdmins, count ?? 0, "admins");
   const { error } = await supabase.from("organiser_members").insert({ organiser_id: org.id, email, name, role: "admin", invited_by: user.id });
   if (error) throw new Error(error.code === "23505" ? "That email is already on the team." : error.message);
   await sendEmail({
@@ -94,4 +99,16 @@ export async function deleteCategory(formData: FormData) {
   const { error } = await supabase.from("categories").delete().eq("id", String(formData.get("id"))).eq("organiser_id", org.id);
   if (error) throw new Error(error.message);
   revalidatePath("/admin", "layout");
+}
+
+/** Opens the Stripe customer portal: change plan, update card, download receipts, cancel. */
+export async function openBillingPortal() {
+  const { supabase, org } = await currentOrganiser();
+  const { billing } = await currentPlan(supabase, org.id);
+  if (!billing?.stripe_customer_id) throw new Error("There is no subscription on this account.");
+  const portal = await stripe().billingPortal.sessions.create({
+    customer: billing.stripe_customer_id,
+    return_url: siteUrl("/admin/settings#billing"),
+  });
+  redirect(portal.url);
 }

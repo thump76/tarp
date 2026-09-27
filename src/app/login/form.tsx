@@ -3,8 +3,8 @@ import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 
-export function LoginForm({ next }: { next: string }) {
-  const [email, setEmail] = useState("");
+export function LoginForm({ next, defaultEmail = "" }: { next: string; defaultEmail?: string }) {
+  const [email, setEmail] = useState(defaultEmail);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const router = useRouter();

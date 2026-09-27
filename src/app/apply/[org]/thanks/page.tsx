@@ -20,7 +20,7 @@ export default async function Thanks({ searchParams }: { searchParams: Promise<{
             <Card className="mt-6">
               <p>Thank you. The organiser will review it and email you. If you are approved, the email lists the markets you can book.</p>
               <p className="mt-3 text-sm text-muted">You can sign in with the same email at any time to see where your application is.</p>
-              <Link href="/" className="btn btn-ghost mt-4">Back to the markets</Link>
+              <Link href="/markets" className="btn btn-ghost mt-4">Back to the markets</Link>
             </Card>
           </>
         )}

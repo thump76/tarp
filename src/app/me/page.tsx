@@ -53,7 +53,7 @@ export default async function Me() {
         <Card className="mt-6">
           <p>There is no trader profile for {user?.email} yet.</p>
           <p className="mt-2 text-sm text-muted">If you have applied with a different email, sign in with that one. Otherwise, pick a market and apply.</p>
-          <Link href="/" className="btn btn-primary mt-4">See the markets</Link>
+          <Link href="/markets" className="btn btn-primary mt-4">See the markets</Link>
         </Card>
       )}
 
